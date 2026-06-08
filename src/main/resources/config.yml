@@ -1,0 +1,21 @@
+# TrialMiner configuration
+
+# If true, players only get the state-preserving drop when mining with a
+# Silk Touch pickaxe. If false, any tool works.
+require-silk-touch: true
+
+# If true, only players with the "trialminer.mine" permission get the drop.
+# (The permission defaults to true, so this is only useful if you revoke it.)
+require-permission: true
+
+# Restore the ominous state of the spawner when it is placed back down.
+# Block-entity data (loot tables, spawned mobs, cooldown, tracked players/
+# entities) is always preserved; this only controls the ominous block state.
+preserve-ominous: true
+
+# Drop the item when a trial spawner is broken in creative mode.
+# Enabled so Silk Touch mining works in both survival and creative.
+drop-in-creative: true
+
+# Play the normal block-break particles/sound when the spawner is mined.
+break-effect: true

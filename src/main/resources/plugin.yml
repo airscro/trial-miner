@@ -1,0 +1,21 @@
+name: TrialMiner
+version: '${project.version}'
+main: com.example.trialminer.TrialMinerPlugin
+# Mojang's new versioning scheme -> major.minor of Minecraft 26.1.x.
+# If the server refuses to load with "unknown api-version", set this to the
+# value your server reports (e.g. '1.21' on older servers).
+api-version: '26.1'
+description: Mine trial spawners and keep their full state (loot, mobs, cooldown, ominous).
+authors:
+  - centers
+commands:
+  trialminer:
+    description: TrialMiner commands.
+    usage: /trialminer <reload|give>
+permissions:
+  trialminer.mine:
+    description: Allows mining trial spawners and receiving the state-preserving drop.
+    default: true
+  trialminer.admin:
+    description: Allows reloading config and giving trial spawner items.
+    default: op
