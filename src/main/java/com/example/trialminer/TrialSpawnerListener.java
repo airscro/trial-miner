@@ -36,12 +36,16 @@ public final class TrialSpawnerListener implements Listener {
 
     private final TrialMinerPlugin plugin;
     private final NamespacedKey idKey;
+    private final NamespacedKey cooldownRemainingKey;
+    private final NamespacedKey cooldownLengthKey;
 
     private final Map<UUID, TrialSpawner> stateCache = new ConcurrentHashMap<>();
 
     public TrialSpawnerListener(TrialMinerPlugin plugin) {
         this.plugin = plugin;
         this.idKey = new NamespacedKey(plugin, "spawner_state_id");
+        this.cooldownRemainingKey = new NamespacedKey(plugin, "spawner_cooldown_remaining");
+        this.cooldownLengthKey = new NamespacedKey(plugin, "spawner_cooldown_length");
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
@@ -70,12 +74,33 @@ public final class TrialSpawnerListener implements Listener {
 
         event.setCancelled(true);
 
+        World world = block.getWorld();
+
+        // How much cooldown was left at the moment of breaking. We store the
+        // *remaining* time (not the absolute end tick) so the cooldown survives
+        // a server restart and is independent of any per-world game-time offset.
+        long now = world.getGameTime();
+        long cooldownEnd = 0L;
+        try {
+            cooldownEnd = spawnerState.getCooldownEnd();
+        } catch (Throwable ignored) {
+        }
+        long cooldownRemaining = Math.max(0L, cooldownEnd - now);
+
+        int cooldownLength = DEFAULT_COOLDOWN_TICKS;
+        try {
+            int len = spawnerState.getCooldownLength();
+            if (len > 0) {
+                cooldownLength = len;
+            }
+        } catch (Throwable ignored) {
+        }
+
         UUID id = UUID.randomUUID();
         stateCache.put(id, spawnerState);
 
-        ItemStack drop = buildSpawnerItem(spawnerState, id);
+        ItemStack drop = buildSpawnerItem(spawnerState, id, cooldownRemaining, cooldownLength);
 
-        World world = block.getWorld();
         Location center = block.getLocation().add(0.5, 0.5, 0.5);
 
         if (plugin.getConfig().getBoolean("break-effect", true)) {
@@ -103,62 +128,87 @@ public final class TrialSpawnerListener implements Listener {
             return;
         }
 
-        String idStr = meta.getPersistentDataContainer().get(idKey, PersistentDataType.STRING);
-        if (idStr == null) {
+        var pdc = meta.getPersistentDataContainer();
+        String idStr = pdc.get(idKey, PersistentDataType.STRING);
+        Long remaining = pdc.get(cooldownRemainingKey, PersistentDataType.LONG);
+
+        // Not one of our state-preserving spawners: leave it to vanilla.
+        if (idStr == null && remaining == null) {
             return;
         }
 
-        TrialSpawner source;
-        try {
-            source = stateCache.get(UUID.fromString(idStr));
-        } catch (IllegalArgumentException ex) {
-            source = null;
+        TrialSpawner source = null;
+        if (idStr != null) {
+            try {
+                source = stateCache.get(UUID.fromString(idStr));
+            } catch (IllegalArgumentException ex) {
+                source = null;
+            }
         }
-        if (source == null) {
-            return;
-        }
+
+        Long storedLength = pdc.get(cooldownLengthKey, PersistentDataType.LONG);
 
         final TrialSpawner src = source;
+        final long cooldownRemaining = remaining != null ? remaining : 0L;
+        final int cooldownLength = storedLength != null && storedLength > 0
+                ? (int) Math.min(storedLength, Integer.MAX_VALUE)
+                : DEFAULT_COOLDOWN_TICKS;
         final Location loc = block.getLocation();
-        plugin.getServer().getScheduler().runTaskLater(plugin, () -> restoreState(loc, src), RESTORE_DELAY_TICKS);
+        plugin.getServer().getScheduler().runTaskLater(plugin,
+                () -> restoreState(loc, src, cooldownRemaining, cooldownLength), RESTORE_DELAY_TICKS);
     }
 
-    private void restoreState(Location loc, TrialSpawner stored) {
+    private void restoreState(Location loc, TrialSpawner stored, long cooldownRemaining, int cooldownLength) {
         Block block = loc.getBlock();
         if (block.getType() != Material.TRIAL_SPAWNER) {
             return;
         }
 
         boolean preserveOminous = plugin.getConfig().getBoolean("preserve-ominous", true);
-        boolean ominous = stored.isOminous();
 
-        if (preserveOminous && ominous) {
-            BlockData data = block.getBlockData();
-            if (data instanceof org.bukkit.block.data.type.TrialSpawner spawnerData) {
+        // Ominous comes from the cached snapshot when available, otherwise from
+        // the block-entity data the item already carried into the placed block.
+        BlockData data = block.getBlockData();
+        boolean ominous;
+        if (stored != null) {
+            ominous = stored.isOminous();
+        } else if (data instanceof org.bukkit.block.data.type.TrialSpawner sd) {
+            ominous = sd.isOminous();
+        } else {
+            ominous = false;
+        }
+
+        // A spawner only respects its cooldownEnd while its blockstate is COOLDOWN.
+        // A freshly placed block defaults to INACTIVE, which is why breaking and
+        // replacing used to reset the timer. Force the COOLDOWN state so the
+        // remaining time is actually honored.
+        boolean onCooldown = cooldownRemaining > 0L;
+        if (data instanceof org.bukkit.block.data.type.TrialSpawner spawnerData) {
+            if (preserveOminous && ominous) {
                 spawnerData.setOminous(true);
-                block.setBlockData(spawnerData, false);
             }
+            if (onCooldown) {
+                spawnerData.setTrialSpawnerState(org.bukkit.block.data.type.TrialSpawner.State.COOLDOWN);
+            }
+            block.setBlockData(spawnerData, false);
         }
 
         if (!(block.getState() instanceof TrialSpawner live)) {
             return;
         }
 
-        copyConfiguration(stored.getNormalConfiguration(), live.getNormalConfiguration());
-        copyConfiguration(stored.getOminousConfiguration(), live.getOminousConfiguration());
-
-        trySet(() -> live.setRequiredPlayerRange(stored.getRequiredPlayerRange()));
-
-        int storedCooldown;
-        try {
-            storedCooldown = stored.getCooldownLength();
-        } catch (Throwable t) {
-            storedCooldown = 0;
+        if (stored != null) {
+            copyConfiguration(stored.getNormalConfiguration(), live.getNormalConfiguration());
+            copyConfiguration(stored.getOminousConfiguration(), live.getOminousConfiguration());
+            trySet(() -> live.setRequiredPlayerRange(stored.getRequiredPlayerRange()));
         }
-        final int cooldown = storedCooldown > 0 ? storedCooldown : DEFAULT_COOLDOWN_TICKS;
-        final long cooldownEnd = loc.getWorld().getGameTime() + cooldown;
-        trySet(() -> live.setCooldownLength(cooldown));
-        trySet(() -> live.setCooldownEnd(cooldownEnd));
+
+        final int length = cooldownLength > 0 ? cooldownLength : DEFAULT_COOLDOWN_TICKS;
+        trySet(() -> live.setCooldownLength(length));
+        if (onCooldown) {
+            final long cooldownEnd = loc.getWorld().getGameTime() + cooldownRemaining;
+            trySet(() -> live.setCooldownEnd(cooldownEnd));
+        }
         trySet(() -> live.setNextSpawnAttempt(0));
 
         if (preserveOminous) {
@@ -199,7 +249,7 @@ public final class TrialSpawnerListener implements Listener {
         });
     }
 
-    private ItemStack buildSpawnerItem(BlockState state, UUID id) {
+    private ItemStack buildSpawnerItem(BlockState state, UUID id, long cooldownRemaining, int cooldownLength) {
         ItemStack drop = new ItemStack(Material.TRIAL_SPAWNER);
         ItemMeta meta = drop.getItemMeta();
         if (meta == null) {
@@ -208,7 +258,12 @@ public final class TrialSpawnerListener implements Listener {
         if (meta instanceof BlockStateMeta blockStateMeta) {
             blockStateMeta.setBlockState(state);
         }
-        meta.getPersistentDataContainer().set(idKey, PersistentDataType.STRING, id.toString());
+        var pdc = meta.getPersistentDataContainer();
+        pdc.set(idKey, PersistentDataType.STRING, id.toString());
+        // Persist the cooldown on the item itself so it survives a server
+        // restart (which clears the in-memory state cache).
+        pdc.set(cooldownRemainingKey, PersistentDataType.LONG, cooldownRemaining);
+        pdc.set(cooldownLengthKey, PersistentDataType.LONG, (long) cooldownLength);
         drop.setItemMeta(meta);
         return drop;
     }
