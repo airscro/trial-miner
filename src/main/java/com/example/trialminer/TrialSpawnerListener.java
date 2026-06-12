@@ -1,9 +1,12 @@
 package com.example.trialminer;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Effect;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -15,6 +18,7 @@ import org.bukkit.block.BlockState;
 import org.bukkit.block.TrialSpawner;
 import org.bukkit.block.data.BlockData;
 import org.bukkit.enchantments.Enchantment;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -249,7 +253,7 @@ public final class TrialSpawnerListener implements Listener {
         });
     }
 
-    private ItemStack buildSpawnerItem(BlockState state, UUID id, long cooldownRemaining, int cooldownLength) {
+    private ItemStack buildSpawnerItem(TrialSpawner state, UUID id, long cooldownRemaining, int cooldownLength) {
         ItemStack drop = new ItemStack(Material.TRIAL_SPAWNER);
         ItemMeta meta = drop.getItemMeta();
         if (meta == null) {
@@ -264,8 +268,56 @@ public final class TrialSpawnerListener implements Listener {
         // restart (which clears the in-memory state cache).
         pdc.set(cooldownRemainingKey, PersistentDataType.LONG, cooldownRemaining);
         pdc.set(cooldownLengthKey, PersistentDataType.LONG, (long) cooldownLength);
+
+        boolean ominous = false;
+        try {
+            ominous = state.isOminous();
+        } catch (Throwable ignored) {
+        }
+
+        List<String> lore = new ArrayList<>();
+        EntityType mob = getSpawnedType(state, ominous);
+        String mobName = mob != null ? prettify(mob.name()) : "Unknown";
+        lore.add(ChatColor.GRAY + "Mob: " + ChatColor.WHITE + mobName);
+        lore.add(ChatColor.GRAY + "Type: "
+                + (ominous ? ChatColor.GOLD + "Ominous" : ChatColor.AQUA + "Normal"));
+        meta.setLore(lore);
+
         drop.setItemMeta(meta);
         return drop;
+    }
+
+    private EntityType getSpawnedType(TrialSpawner state, boolean ominous) {
+        try {
+            TrialSpawnerConfiguration config = ominous
+                    ? state.getOminousConfiguration()
+                    : state.getNormalConfiguration();
+            if (config == null) {
+                return null;
+            }
+            var entity = config.getSpawnedEntity();
+            if (entity != null) {
+                return entity.getEntityType();
+            }
+            return config.getSpawnedType();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private String prettify(String raw) {
+        String[] parts = raw.toLowerCase().split("_");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(part.charAt(0))).append(part.substring(1));
+        }
+        return sb.toString();
     }
 
     private boolean mayMine(Player player) {
