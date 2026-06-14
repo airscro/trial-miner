@@ -150,6 +150,12 @@ public final class TrialSpawnerListener implements Listener {
             }
         }
 
+        if (source == null && meta instanceof BlockStateMeta blockStateMeta
+                && blockStateMeta.hasBlockState()
+                && blockStateMeta.getBlockState() instanceof TrialSpawner itemState) {
+            source = itemState;
+        }
+
         Long storedLength = pdc.get(cooldownLengthKey, PersistentDataType.LONG);
 
         final TrialSpawner src = source;
