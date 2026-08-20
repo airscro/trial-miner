@@ -4,7 +4,7 @@
   "version": "${version}",
   "name": "TrialMiner",
   "description": "Safely mine inactive or cooling-down trial spawners with Silk Touch.",
-  "authors": ["centers"],
+  "authors": ["airscro"],
   "environment": "*",
   "entrypoints": {
     "main": ["com.example.trialminer.fabric.TrialMinerFabric"]

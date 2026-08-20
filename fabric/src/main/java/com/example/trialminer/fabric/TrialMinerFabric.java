@@ -32,14 +32,6 @@ import net.minecraft.world.level.block.entity.TrialSpawnerBlockEntity;
 import net.minecraft.world.level.block.entity.trialspawner.TrialSpawnerState;
 import net.minecraft.world.level.block.state.BlockState;
 
-/**
- * Fabric single-player/server implementation of TrialMiner's safe mining rule.
- *
- * <p>Vanilla does not expose a stable item format for partially completed trial
- * spawners. The mod therefore only serializes spawners after a trial has ended
- * (INACTIVE or COOLDOWN), so replacing the item can never reset a live mob
- * quota.</p>
- */
 public final class TrialMinerFabric implements ModInitializer {
     @Override
     public void onInitialize() {
@@ -104,10 +96,6 @@ public final class TrialMinerFabric implements ModInitializer {
             return InteractionResult.PASS;
         }
 
-        // Trial spawners are unbreakable in vanilla, so PlayerBlockBreakEvents
-        // never fires for them. Claim the left click on the client to ensure it
-        // reaches the integrated server, where the state-preserving break is
-        // performed below.
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
         }
@@ -133,8 +121,6 @@ public final class TrialMinerFabric implements ModInitializer {
                 spawner.saveWithoutMetadata(level.registryAccess())));
         addSpawnerLore(drop, spawner, state);
 
-        // Returning false suppresses vanilla's normal no-drop trial-spawner
-        // break. Remove the block and create exactly one state-preserving drop.
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         level.addFreshEntity(new ItemEntity(level, pos.getX() + 0.5D, pos.getY() + 0.5D,
                 pos.getZ() + 0.5D, drop));

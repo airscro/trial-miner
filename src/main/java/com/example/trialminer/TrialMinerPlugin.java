@@ -78,9 +78,6 @@ public final class TrialMinerPlugin extends JavaPlugin {
     }
 
     private void dumpSpawner(CommandSender sender, String[] args) {
-        // Two ways to target a spawner:
-        //   /trialminer debug                -> block the player is looking at / standing on
-        //   /trialminer debug <x> <y> <z>    -> explicit coords (works from console too)
         Block block = null;
         if (args.length >= 4) {
             try {
@@ -168,8 +165,6 @@ public final class TrialMinerPlugin extends JavaPlugin {
         out(sender, "  spawnRange: " + safe(cfg::getSpawnRange));
     }
 
-    // Echo to the player (if any) AND to the server console/log, so the output
-    // can be read from logs/latest.log when in-game copy/paste isn't possible.
     private void out(CommandSender sender, String msg) {
         if (sender instanceof Player) {
             sender.sendMessage(msg);

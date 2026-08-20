@@ -71,12 +71,6 @@ public final class TrialSpawnerListener implements Listener {
             return;
         }
 
-        // Paper exposes the spawner's configuration and cooldown, but not the
-        // live trial counters (for example, how many mobs have already spawned
-        // in this activation). Replacing an active trial spawner would create a
-        // new trial with its full quota, duplicating the remaining encounters.
-        // Only mine states with no in-progress trial; COOLDOWN is safe because
-        // the trial has already completed and its remaining duration is saved.
         if (!isSafeToMine(block)) {
             event.setCancelled(true);
             player.sendMessage(ChatColor.RED
@@ -93,9 +87,6 @@ public final class TrialSpawnerListener implements Listener {
 
         World world = block.getWorld();
 
-        // How much cooldown was left at the moment of breaking. We store the
-        // *remaining* time (not the absolute end tick) so the cooldown survives
-        // a server restart and is independent of any per-world game-time offset.
         long now = world.getGameTime();
         long cooldownEnd = 0L;
         try {
@@ -149,7 +140,6 @@ public final class TrialSpawnerListener implements Listener {
         String idStr = pdc.get(idKey, PersistentDataType.STRING);
         Long remaining = pdc.get(cooldownRemainingKey, PersistentDataType.LONG);
 
-        // Not one of our state-preserving spawners: leave it to vanilla.
         if (idStr == null && remaining == null) {
             return;
         }
@@ -189,8 +179,6 @@ public final class TrialSpawnerListener implements Listener {
 
         boolean preserveOminous = plugin.getConfig().getBoolean("preserve-ominous", true);
 
-        // Ominous comes from the cached snapshot when available, otherwise from
-        // the block-entity data the item already carried into the placed block.
         BlockData data = block.getBlockData();
         boolean ominous;
         if (stored != null) {
@@ -201,10 +189,6 @@ public final class TrialSpawnerListener implements Listener {
             ominous = false;
         }
 
-        // A spawner only respects its cooldownEnd while its blockstate is COOLDOWN.
-        // A freshly placed block defaults to INACTIVE, which is why breaking and
-        // replacing used to reset the timer. Force the COOLDOWN state so the
-        // remaining time is actually honored.
         boolean onCooldown = cooldownRemaining > 0L;
         if (data instanceof org.bukkit.block.data.type.TrialSpawner spawnerData) {
             if (preserveOminous && ominous) {
@@ -283,8 +267,6 @@ public final class TrialSpawnerListener implements Listener {
         }
         var pdc = meta.getPersistentDataContainer();
         pdc.set(idKey, PersistentDataType.STRING, id.toString());
-        // Persist the cooldown on the item itself so it survives a server
-        // restart (which clears the in-memory state cache).
         pdc.set(cooldownRemainingKey, PersistentDataType.LONG, cooldownRemaining);
         pdc.set(cooldownLengthKey, PersistentDataType.LONG, (long) cooldownLength);
 

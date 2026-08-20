@@ -7,7 +7,7 @@ main: com.example.trialminer.TrialMinerPlugin
 api-version: '26.1'
 description: Mine safe trial spawners while preserving configuration, cooldown, and ominous state.
 authors:
-  - centers
+  - airscro
 commands:
   trialminer:
     description: TrialMiner commands.
