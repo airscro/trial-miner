@@ -9,8 +9,9 @@ require-silk-touch: true
 require-permission: true
 
 # Restore the ominous state of the spawner when it is placed back down.
-# Block-entity data (loot tables, spawned mobs, cooldown, tracked players/
-# entities) is always preserved; this only controls the ominous block state.
+# Configuration and cooldown data are preserved; live trial progress is not.
+# Spawners therefore cannot be mined while a trial is in progress.
+# This only controls the ominous block state.
 preserve-ominous: true
 
 # Drop the item when a trial spawner is broken in creative mode.

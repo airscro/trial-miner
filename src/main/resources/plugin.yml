@@ -5,7 +5,7 @@ main: com.example.trialminer.TrialMinerPlugin
 # If the server refuses to load with "unknown api-version", set this to the
 # value your server reports (e.g. '1.21' on older servers).
 api-version: '26.1'
-description: Mine trial spawners and keep their full state (loot, mobs, cooldown, ominous).
+description: Mine safe trial spawners while preserving configuration, cooldown, and ominous state.
 authors:
   - centers
 commands:

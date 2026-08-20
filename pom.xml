@@ -9,7 +9,7 @@
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>TrialMiner</name>
-    <description>Mine trial spawners and keep their full state (loot, mobs, cooldown, ominous).</description>
+    <description>Mine safe trial spawners while preserving configuration, cooldown, and ominous state.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

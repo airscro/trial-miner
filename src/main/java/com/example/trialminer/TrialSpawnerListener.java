@@ -71,6 +71,19 @@ public final class TrialSpawnerListener implements Listener {
             return;
         }
 
+        // Paper exposes the spawner's configuration and cooldown, but not the
+        // live trial counters (for example, how many mobs have already spawned
+        // in this activation). Replacing an active trial spawner would create a
+        // new trial with its full quota, duplicating the remaining encounters.
+        // Only mine states with no in-progress trial; COOLDOWN is safe because
+        // the trial has already completed and its remaining duration is saved.
+        if (!isSafeToMine(block)) {
+            event.setCancelled(true);
+            player.sendMessage(ChatColor.RED
+                    + "You cannot mine a trial spawner while its trial is in progress.");
+            return;
+        }
+
         BlockState state = block.getState();
         if (!(state instanceof TrialSpawner spawnerState)) {
             return;
@@ -348,6 +361,17 @@ public final class TrialSpawnerListener implements Listener {
             }
         }
         return false;
+    }
+
+    private boolean isSafeToMine(Block block) {
+        BlockData data = block.getBlockData();
+        if (!(data instanceof org.bukkit.block.data.type.TrialSpawner spawnerData)) {
+            return false;
+        }
+
+        org.bukkit.block.data.type.TrialSpawner.State state = spawnerData.getTrialSpawnerState();
+        return state == org.bukkit.block.data.type.TrialSpawner.State.INACTIVE
+                || state == org.bukkit.block.data.type.TrialSpawner.State.COOLDOWN;
     }
 
     private void trySet(Runnable setter) {
