@@ -7,6 +7,7 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
@@ -44,8 +45,10 @@ public final class TrialMinerFabric implements ModInitializer {
 
         TrialSpawnerState trialState = state.getValue(TrialSpawnerBlock.STATE);
         if (trialState != TrialSpawnerState.INACTIVE && trialState != TrialSpawnerState.COOLDOWN) {
-            player.sendSystemMessage(Component.literal(
-                    "You cannot mine a trial spawner while its trial is in progress."));
+            if (player instanceof ServerPlayer serverPlayer) {
+                serverPlayer.sendSystemMessage(Component.literal(
+                        "You cannot mine a trial spawner while its trial is in progress."));
+            }
             return false;
         }
 

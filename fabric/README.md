@@ -1,8 +1,8 @@
 # TrialMiner Fabric
 
-Fabric version of TrialMiner for Minecraft 26.1.2, intended for single-player
+Fabric version of TrialMiner for Minecraft 1.21.11, intended for single-player
 worlds (and compatible Fabric servers). Install Fabric Loader and Fabric API,
-then place the built `trialminer-fabric-1.0.0.jar` in the instance's `mods`
+then place the built `trialminer-fabric-1.0.0+1.21.11.jar` in the instance's `mods`
 folder.
 
 Use a Silk Touch tool to mine trial spawners only while they are `INACTIVE` or
@@ -17,4 +17,4 @@ Build with the included Gradle wrapper:
 ./gradlew build
 ```
 
-The output is `build/libs/trialminer-fabric-1.0.0.jar`.
+The output is `build/libs/trialminer-fabric-1.0.0+1.21.11.jar`.
