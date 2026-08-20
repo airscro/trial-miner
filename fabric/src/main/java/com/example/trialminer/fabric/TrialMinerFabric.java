@@ -1,10 +1,13 @@
 package com.example.trialminer.fabric;
 
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -35,6 +38,57 @@ public final class TrialMinerFabric implements ModInitializer {
     @Override
     public void onInitialize() {
         PlayerBlockBreakEvents.BEFORE.register(this::beforeBlockBreak);
+        CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
+                dispatcher.register(Commands.literal("trialminer")
+                        .executes(context -> showHelp(context.getSource()))
+                        .then(Commands.literal("give")
+                                .executes(context -> giveSpawner(context.getSource())))
+                        .then(Commands.literal("debug")
+                                .executes(context -> debugSpawner(context.getSource())))));
+    }
+
+    private int showHelp(CommandSourceStack source) {
+        source.sendSuccess(() -> Component.literal("TrialMiner: mine inactive or cooldown trial "
+                + "spawners with Silk Touch."), false);
+        source.sendSuccess(() -> Component.literal("/trialminer give - give yourself a trial spawner"),
+                false);
+        source.sendSuccess(() -> Component.literal("/trialminer debug - inspect the spawner below you"),
+                false);
+        return 1;
+    }
+
+    private int giveSpawner(CommandSourceStack source) {
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            player.getInventory().add(new ItemStack(Blocks.TRIAL_SPAWNER));
+            source.sendSuccess(() -> Component.literal(
+                    "Gave you a trial spawner. Place it, configure it, mine it back."), false);
+            return 1;
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException exception) {
+            source.sendFailure(Component.literal("Only players can use /trialminer give."));
+            return 0;
+        }
+    }
+
+    private int debugSpawner(CommandSourceStack source) {
+        try {
+            ServerPlayer player = source.getPlayerOrException();
+            ServerLevel level = source.getLevel();
+            BlockPos pos = player.blockPosition().below();
+            BlockState state = level.getBlockState(pos);
+            if (!state.is(Blocks.TRIAL_SPAWNER)) {
+                source.sendFailure(Component.literal("Stand on a trial spawner to debug it."));
+                return 0;
+            }
+
+            source.sendSuccess(() -> Component.literal("Trial spawner at " + pos.toShortString()
+                    + ": " + state.getValue(TrialSpawnerBlock.STATE)
+                    + ", ominous=" + state.getValue(TrialSpawnerBlock.OMINOUS)), false);
+            return 1;
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException exception) {
+            source.sendFailure(Component.literal("Only players can use /trialminer debug."));
+            return 0;
+        }
     }
 
     private boolean beforeBlockBreak(Level level, Player player, BlockPos pos,
