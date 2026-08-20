@@ -1,11 +1,14 @@
 package com.example.trialminer.fabric;
 
+import java.util.List;
+
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
@@ -16,6 +19,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.ItemLore;
 import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
 import net.minecraft.world.item.enchantment.Enchantments;
@@ -127,6 +131,7 @@ public final class TrialMinerFabric implements ModInitializer {
         drop.set(DataComponents.BLOCK_ENTITY_DATA, TypedEntityData.of(
                 BlockEntityType.TRIAL_SPAWNER,
                 spawner.saveWithoutMetadata(level.registryAccess())));
+        addSpawnerLore(drop, spawner, state);
 
         // Returning false suppresses vanilla's normal no-drop trial-spawner
         // break. Remove the block and create exactly one state-preserving drop.
@@ -141,5 +146,38 @@ public final class TrialMinerFabric implements ModInitializer {
                 level.registryAccess().lookupOrThrow(Registries.ENCHANTMENT)
                         .getOrThrow(Enchantments.SILK_TOUCH),
                 tool) > 0;
+    }
+
+    private void addSpawnerLore(ItemStack item, TrialSpawnerBlockEntity spawner, BlockState state) {
+        String mob = "Unknown";
+        var potentials = spawner.getTrialSpawner().activeConfig().spawnPotentialsDefinition().unwrap();
+        if (!potentials.isEmpty()) {
+            String entityId = potentials.getFirst().value().getEntityToSpawn()
+                    .getStringOr("id", "unknown");
+            mob = prettifyEntityId(entityId);
+        }
+
+        boolean ominous = state.getValue(TrialSpawnerBlock.OMINOUS);
+        item.set(DataComponents.LORE, new ItemLore(List.of(
+                Component.literal("Mob: ").withStyle(ChatFormatting.GRAY)
+                        .append(Component.literal(mob).withStyle(ChatFormatting.WHITE)),
+                Component.literal("Type: ").withStyle(ChatFormatting.GRAY)
+                        .append(Component.literal(ominous ? "Ominous" : "Normal")
+                                .withStyle(ominous ? ChatFormatting.GOLD : ChatFormatting.AQUA)))));
+    }
+
+    private String prettifyEntityId(String entityId) {
+        String path = entityId.contains(":") ? entityId.substring(entityId.indexOf(':') + 1) : entityId;
+        StringBuilder result = new StringBuilder();
+        for (String word : path.split("_")) {
+            if (word.isEmpty()) {
+                continue;
+            }
+            if (!result.isEmpty()) {
+                result.append(' ');
+            }
+            result.append(Character.toUpperCase(word.charAt(0))).append(word.substring(1));
+        }
+        return result.isEmpty() ? "Unknown" : result.toString();
     }
 }
