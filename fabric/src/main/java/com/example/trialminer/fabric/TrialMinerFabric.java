@@ -2,7 +2,7 @@ package com.example.trialminer.fabric;
 
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
+import net.fabricmc.fabric.api.event.player.AttackBlockCallback;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.Registries;
@@ -13,6 +13,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.component.TypedEntityData;
 import net.minecraft.world.item.enchantment.EnchantmentHelper;
@@ -37,7 +39,7 @@ import net.minecraft.world.level.block.state.BlockState;
 public final class TrialMinerFabric implements ModInitializer {
     @Override
     public void onInitialize() {
-        PlayerBlockBreakEvents.BEFORE.register(this::beforeBlockBreak);
+        AttackBlockCallback.EVENT.register(this::onAttackBlock);
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) ->
                 dispatcher.register(Commands.literal("trialminer")
                         .executes(context -> showHelp(context.getSource()))
@@ -91,10 +93,19 @@ public final class TrialMinerFabric implements ModInitializer {
         }
     }
 
-    private boolean beforeBlockBreak(Level level, Player player, BlockPos pos,
-            BlockState state, BlockEntity blockEntity) {
-        if (level.isClientSide() || !state.is(Blocks.TRIAL_SPAWNER)) {
-            return true;
+    private InteractionResult onAttackBlock(Player player, Level level, InteractionHand hand,
+            BlockPos pos, net.minecraft.core.Direction direction) {
+        BlockState state = level.getBlockState(pos);
+        if (!state.is(Blocks.TRIAL_SPAWNER)) {
+            return InteractionResult.PASS;
+        }
+
+        // Trial spawners are unbreakable in vanilla, so PlayerBlockBreakEvents
+        // never fires for them. Claim the left click on the client to ensure it
+        // reaches the integrated server, where the state-preserving break is
+        // performed below.
+        if (level.isClientSide()) {
+            return InteractionResult.SUCCESS;
         }
 
         TrialSpawnerState trialState = state.getValue(TrialSpawnerBlock.STATE);
@@ -103,12 +114,13 @@ public final class TrialMinerFabric implements ModInitializer {
                 serverPlayer.sendSystemMessage(Component.literal(
                         "You cannot mine a trial spawner while its trial is in progress."));
             }
-            return false;
+            return InteractionResult.FAIL;
         }
 
+        BlockEntity blockEntity = level.getBlockEntity(pos);
         if (!(blockEntity instanceof TrialSpawnerBlockEntity spawner)
-                || !hasSilkTouch(level, player.getMainHandItem())) {
-            return true;
+                || !hasSilkTouch(level, player.getItemInHand(hand))) {
+            return InteractionResult.PASS;
         }
 
         ItemStack drop = new ItemStack(Blocks.TRIAL_SPAWNER);
@@ -121,7 +133,7 @@ public final class TrialMinerFabric implements ModInitializer {
         level.setBlock(pos, Blocks.AIR.defaultBlockState(), 3);
         level.addFreshEntity(new ItemEntity(level, pos.getX() + 0.5D, pos.getY() + 0.5D,
                 pos.getZ() + 0.5D, drop));
-        return false;
+        return InteractionResult.SUCCESS;
     }
 
     private boolean hasSilkTouch(Level level, ItemStack tool) {
